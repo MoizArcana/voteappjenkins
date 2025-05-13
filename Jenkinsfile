@@ -4,7 +4,7 @@ pipeline {
     environment {
         OPTION_A = "Cats"
         OPTION_B = "Dogs"
-        PORT = "5000"  // Changed port from 80 to 5000
+        PORT = "5000"  // Using port 5000
         VENV_DIR = ".venv"
     }
 
@@ -43,6 +43,9 @@ pipeline {
                     # Run the Flask app with Gunicorn on port 5000
                     nohup gunicorn app:app -b 0.0.0.0:${PORT} \
                         --log-file - --access-logfile - --workers 4 --keep-alive 0 > app.log 2>&1 &
+
+                    # Sleep for 60 seconds to keep the app running and allow checking
+                    sleep 60
                 '''
             }
         }
