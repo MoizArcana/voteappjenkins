@@ -4,7 +4,7 @@ pipeline {
     environment {
         OPTION_A = "Cats"
         OPTION_B = "Dogs"
-        PORT = "80"
+        PORT = "5000"  // Changed port from 80 to 5000
         VENV_DIR = ".venv"
     }
 
@@ -18,9 +18,13 @@ pipeline {
         stage('Set up Python Environment') {
             steps {
                 sh '''
-                    VENV_DIR=".venv"
+                    # Create virtual environment
                     python3 -m venv ${VENV_DIR}
+
+                    # Activate virtual environment (using dot instead of source)
                     . ${VENV_DIR}/bin/activate
+
+                    # Upgrade pip and install requirements
                     pip install --upgrade pip
                     pip install -r requirements.txt
                 '''
@@ -30,10 +34,13 @@ pipeline {
         stage('Run Application') {
             steps {
                 sh '''
-                    # Kill any existing app on port 80 (optional, Unix only)
+                    # Kill any existing app on port 5000 (optional, Unix only)
                     fuser -k ${PORT}/tcp || true
 
-                    source ${VENV_DIR}/bin/activate
+                    # Activate virtual environment (using dot instead of source)
+                    . ${VENV_DIR}/bin/activate
+
+                    # Run the Flask app with Gunicorn on port 5000
                     nohup gunicorn app:app -b 0.0.0.0:${PORT} \
                         --log-file - --access-logfile - --workers 4 --keep-alive 0 > app.log 2>&1 &
                 '''
