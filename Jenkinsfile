@@ -48,7 +48,6 @@ pipeline {
                         docker stop voteapp || true
                         docker rm voteapp || true
                         docker run -d --name voteapp -p 80:80 ${IMAGE_NAME}:${TAG}
-                        EOF
                     """
                 }
             }
