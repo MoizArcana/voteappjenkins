@@ -2,61 +2,62 @@ pipeline {
     agent any
 
     environment {
-        OPTION_A = "Cats"
-        OPTION_B = "Dogs"
-        PORT = "5000"  // Using port 5000
-        VENV_DIR = ".venv"
+        IMAGE_NAME = "moiz3388/voteappjenkins"
+        TAG = "latest"
+        EC2_HOST = "ubuntu@54.89.241.89" 
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/MoizArcana/voteapp.git'
+                git 'https://github.com/MoizArcana/voteappjenkins.git'
             }
         }
 
-        stage('Set up Python Environment') {
+        stage('Build Docker Image') {
             steps {
-                sh '''
-                    # Create virtual environment
-                    python3 -m venv ${VENV_DIR}
-
-                    # Activate virtual environment (using dot instead of source)
-                    . ${VENV_DIR}/bin/activate
-
-                    # Upgrade pip and install requirements
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
+                sh "docker build -t ${IMAGE_NAME}:${TAG} ."
             }
         }
 
-        stage('Run Application') {
+        stage('Push to Docker Hub') {
             steps {
-                sh '''
-                    # Kill any existing app on port 5000 (optional, Unix only)
-                    fuser -k ${PORT}/tcp || true
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-credentials',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                        docker push ${IMAGE_NAME}:${TAG}
+                        docker logout
+                    '''
+                }
+            }
+        }
 
-                    # Activate virtual environment (using dot instead of source)
-                    . ${VENV_DIR}/bin/activate
-
-                    # Run the Flask app with Gunicorn on port 5000
-                    nohup gunicorn app:app -b 0.0.0.0:${PORT} \
-                        --log-file - --access-logfile - --workers 4 --keep-alive 0 > app.log 2>&1 &
-
-                    # Sleep for 60 seconds to keep the app running and allow checking
-                    sleep 60
-                '''
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(['ec2-ssh-key']) { 
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} << 'EOF'
+                        docker pull ${IMAGE_NAME}:${TAG}
+                        docker stop voteapp || true
+                        docker rm voteapp || true
+                        docker run -d --name voteapp -p 80:80 ${IMAGE_NAME}:${TAG}
+                        EOF
+                    """
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Flask app started successfully.'
+            echo 'Docker image pushed and deployed to EC2 successfully.'
         }
         failure {
-            echo 'There was a problem running the app.'
+            echo 'There was an issue with the pipeline process.'
         }
     }
 }
