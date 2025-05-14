@@ -38,9 +38,12 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-ssh-key']) { 
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'ec2-ssh-key',
+                    keyFileVariable: 'SSH_KEY'
+                )]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} << 'EOF'
+                        ssh -i \$SSH_KEY -o StrictHostKeyChecking=no ${EC2_HOST} << 'EOF'
                         docker pull ${IMAGE_NAME}:${TAG}
                         docker stop voteapp || true
                         docker rm voteapp || true
@@ -61,3 +64,4 @@ pipeline {
         }
     }
 }
+
